@@ -112,7 +112,7 @@ func _client_receive(id):
 				])
 		
 		#Send lobby_name and result_page_name to client
-		data = ["CG", lobby_id+lobby_name, result_page_name]
+		data = ["CG", lobby_id, lobby_name, result_page_name]
 		send_data(data, id)
 		
 	if code == "JG": #Join Game
@@ -143,8 +143,9 @@ func _client_receive(id):
 				{"player_name":player_name, "player_client_id":id, "lobby_id":lobby_id}
 			])
 			#send questions
-			var questions_selected = db.select_rows("questions", "lobby_id = '%d'" % lobby_id, ["question","answer"])
-			send_data(["JG", questions_selected],id)
+			var questions_selected = db.select_rows("questions", "lobby_id = '%d'" % lobby_id, ["question","answer"]).duplicate(true)
+			var words_selected = db.select_rows("additional_words", "lobby_id = '%d'" % lobby_id, ["word"]).duplicate(true)
+			send_data(["JG", questions_selected, words_selected, player_name],id)
 			
 		else:
 			#Send Error to Client that Lobby does not exist.
@@ -154,9 +155,37 @@ func _client_receive(id):
 			return
 		
 	if code == "GR": #Game Results
+		print(received) # 
+		var player_name = received[1]
+		var correct_questions = received[2]
+		var wrong_questions = received[3]
+		
+		#check player_client_id and player name.
+		var is_player_in_records = db.select_rows("players", "player_name = '%s' AND player_client_id = '%d'" % [player_name, id], ["player_id", "lobby_id"])
+		print(is_player_in_records)
+		if is_player_in_records != []:
+			var lobby_id = is_player_in_records[0]["lobby_id"]
+			var player_id = is_player_in_records[0]["player_id"]
+			for q in correct_questions:
+				var question_from_db = db.select_rows("questions", "lobby_id = '%d' AND question = '%s'" % [lobby_id, q], ["question_id"])
+				var question_id = question_from_db[0]["question_id"]
+				db.insert_rows("results", [
+					{"player_id": player_id, "question_id": question_id, "correct": 1}
+				])
+
+			for q in wrong_questions:
+				var question_from_db = db.select_rows("questions", "lobby_id = '%d' AND question = '%s'" % [lobby_id, q], ["question_id"])
+				var question_id = question_from_db[0]["question_id"]
+				db.insert_rows("results", [
+					{"player_id": player_id, "question_id": question_id, "correct": 0}
+				])
+
+			pass
+		#receive correct questions.
+		#input data into the results database.
 		pass
 		
-	if code == "EV": #Evaluation
+	if code == "RP": #Results Page
 		pass
 	
 func send_data(data, id):
