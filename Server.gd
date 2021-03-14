@@ -95,7 +95,7 @@ func _client_receive(id):
 		])
 		
 		#Insert questions into the database
-		var lobby = db.select_rows("lobbies", "lobby_name = '%s' AND result_page_name = '%s'" % [lobby_name, result_page_name], ["*"])
+		var lobby = db.select_rows("lobbies", "lobby_name = '%s' AND result_page_name = '%s'" % [lobby_name, result_page_name], ["*"]).duplicate(true)
 		var lobby_id = lobby[0]["lobby_id"]
 		print(questions_received)
 		for q in questions_received:
@@ -161,26 +161,27 @@ func _client_receive(id):
 		var wrong_questions = received[3]
 		
 		#check player_client_id and player name.
-		var is_player_in_records = db.select_rows("players", "player_name = '%s' AND player_client_id = '%d'" % [player_name, id], ["player_id", "lobby_id"])
-		print(is_player_in_records)
+		var is_player_in_records = db.select_rows("players", "player_name = '%s' AND player_client_id = '%d'" % [player_name, id], ["player_id", "lobby_id"]).duplicate(true)
 		if is_player_in_records != []:
 			var lobby_id = is_player_in_records[0]["lobby_id"]
 			var player_id = is_player_in_records[0]["player_id"]
-			for q in correct_questions:
-				var question_from_db = db.select_rows("questions", "lobby_id = '%d' AND question = '%s'" % [lobby_id, q], ["question_id"])
-				var question_id = question_from_db[0]["question_id"]
-				db.insert_rows("results", [
-					{"player_id": player_id, "question_id": question_id, "correct": 1}
-				])
+			var questions_from_db = db.select_rows("questions", "lobby_id = '%d'" % [lobby_id], ["question_id", "question"]).duplicate(true)
+			print(str(questions_from_db))
+			
+			for i in correct_questions:
+				for j in questions_from_db:
+					if i == j["question"]:
+						db.insert_rows("results", [
+							{"player_id":player_id, "question_id":j["question_id"], "correct":1}
+						])
 
-			for q in wrong_questions:
-				var question_from_db = db.select_rows("questions", "lobby_id = '%d' AND question = '%s'" % [lobby_id, q], ["question_id"])
-				var question_id = question_from_db[0]["question_id"]
-				db.insert_rows("results", [
-					{"player_id": player_id, "question_id": question_id, "correct": 0}
-				])
-
-			pass
+			for i in wrong_questions:
+				for j in questions_from_db:
+					if i == j["question"]:
+						db.insert_rows("results", [
+							{"player_id":player_id, "question_id":j["question_id"], "correct":0}
+						])
+						
 		#receive correct questions.
 		#input data into the results database.
 		pass
@@ -188,8 +189,8 @@ func _client_receive(id):
 	if code == "RP": #Results Page
 		pass
 	
-func send_data(data, id):
-	_server.get_peer(id).put_packet(Utils.encode_data(data))
+func send_data(data_send, id):
+	_server.get_peer(id).put_packet(Utils.encode_data(data_send))
 
 func listen():
 	_server.listen(PORT)
