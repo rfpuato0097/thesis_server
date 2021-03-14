@@ -13,11 +13,9 @@ var db
 var data
 
 func _init():
-	print(genCode())
-	
 	#Database
 	db = SQLite.new()
-	db.path = "user://game_db"
+	db.path = "res://game_db"
 	db.verbose_mode = false
 	db.foreign_keys = true
 	db.open_db()
@@ -82,6 +80,7 @@ func _client_receive(id):
 	var is_string = _server.get_peer(id).was_string_packet()
 	#PARSE DATA RECEIVED HERE
 	var received = Utils.decode_data(packet)
+	print(received)
 	
 	var code = received[0]
 	if code == "CG": #Create Game
@@ -165,7 +164,7 @@ func _client_receive(id):
 		if is_player_in_records != []:
 			var lobby_id = is_player_in_records[0]["lobby_id"]
 			var player_id = is_player_in_records[0]["player_id"]
-			var questions_from_db = db.select_rows("questions", "lobby_id = '%d'" % [lobby_id], ["question_id", "question"]).duplicate(true)
+			var questions_from_db = db.select_rows("questions", "lobby_id = '%d'" % [lobby_id], ["question_id", "question", "answer"]).duplicate(true)
 			print(str(questions_from_db))
 			
 			for i in correct_questions:
@@ -181,12 +180,14 @@ func _client_receive(id):
 						db.insert_rows("results", [
 							{"player_id":player_id, "question_id":j["question_id"], "correct":0}
 						])
-						
-		#receive correct questions.
-		#input data into the results database.
-		pass
+			var total = correct_questions.size() + wrong_questions.size()
+			var score = total - correct_questions.size()
+			send_data(["GR", score, total, correct_questions, wrong_questions, questions_from_db], id)
+
+	if code == "EV": #Evaluation Page
+		#Do Learning Analytics here
 		
-	if code == "RP": #Results Page
+		send_data(["EV"],id)
 		pass
 	
 func send_data(data_send, id):
