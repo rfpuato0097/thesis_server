@@ -186,7 +186,92 @@ func _client_receive(id):
 
 	if code == "EV": #Evaluation Page
 		#Do Learning Analytics here
+		var code_received = received[1]
+
+		#select lobby_id by using lobby_name
+		var regex = RegEx.new()
+		regex.compile("[0-9]*")
+		var result = regex.search(code_received).get_string()
+		var lobby_id = int(result)
+		var lobby_name = code_received.replace(result, "")
+		print ("lobby_id: %d lobby_name: %s" % [lobby_id, lobby_name])
 		
+		#check if lobby exists
+		db.query_result = []
+		db.query("SELECT * FROM lobbies WHERE lobby_id = '%d' AND result_page_name = '%s'" % [lobby_id, lobby_name])
+		var lobby_exists = false
+		if db.query_result != []:
+			if db.query_result[0]["lobby_id"] == lobby_id and db.query_result[0]["result_page_name"] == lobby_name:
+				lobby_exists = true
+		print(db.query_result)
+		if lobby_exists:
+			var analytics = []
+			
+			#No. of Players
+			db.query("SELECT COUNT(player_id) FROM players WHERE lobby_id = '%d'" % [lobby_id] )
+			print("No of Players")
+			print(db.query_result)
+			print("")
+			
+			#Ave. Score
+			db.query("SELECT AVG(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE players.lobby_id = '%d'" % [lobby_id] )
+			print("AVE SCORE")
+			print(db.query_result)
+			print("")
+			
+			#Most Difficult Questions
+			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
+			print("DIFF QUESTIONS")
+			print(db.query_result)
+			print("")
+			
+			#Students that need further assistance
+			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
+			print("NEED HELP")
+			print(db.query_result)
+			print("")
+			
+			#Easiest Questions
+			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
+			print("EASY QUESTIONS")
+			print(db.query_result)
+			print("")
+			
+			#Top Students
+			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
+			print("TOP STUDENTS")
+			print(db.query_result)
+			print("")
+			
+			#Get player_ids
+			db.query("SELECT * FROM players WHERE lobby_id = '%d'" % [lobby_id])
+			print("PLAYER IDS")
+			print(db.query_result)
+			print("")
+			var player_ids = db.query_result.duplicate(true)
+			
+			#Get question_ids
+			db.query("SELECT * FROM questions WHERE lobby_id = '%d'" % [lobby_id])
+			print("QUESTION IDS")
+			print(db.query_result)
+			print("")
+			var question_ids = db.query_result.duplicate(true)
+			
+			#Get Person
+			print("PLAYER")
+			for i in player_ids:
+				db.query("SELECT players.player_id, players.player_name, questions.question, questions.answer, results.correct FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON questions.question_id = results.question_id WHERE players.player_id = '%d'" % [i["player_id"]])
+				print(db.query_result)
+				print("")
+			#Get Question
+			for i in question_ids:
+				db.query("SELECT * FROM players INNER JOIN results ON players.player_id = results.player_id WHERE results.question_id = '%d'" % [i["question_id"]])
+				print(db.query_result)
+				print("")
+			
+		else:
+			pass
+
 		send_data(["EV"],id)
 		pass
 	
