@@ -187,6 +187,7 @@ func _client_receive(id):
 	if code == "EV": #Evaluation Page
 		#Do Learning Analytics here
 		var code_received = received[1]
+		var analytics = []
 
 		#select lobby_id by using lobby_name
 		var regex = RegEx.new()
@@ -205,18 +206,24 @@ func _client_receive(id):
 				lobby_exists = true
 		print(db.query_result)
 		if lobby_exists:
-			var analytics = []
-			
 			#No. of Players
-			db.query("SELECT COUNT(player_id) FROM players WHERE lobby_id = '%d'" % [lobby_id] )
+			db.query("SELECT COUNT(player_id) AS 'player_count' FROM players WHERE lobby_id = '%d'" % [lobby_id] )
 			print("No of Players")
 			print(db.query_result)
 			print("")
+			analytics.append(db.query_result.duplicate(true))
+			print("ANALYTICS")
+			print(analytics)
+			print("")
 			
 			#Ave. Score
-			db.query("SELECT AVG(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE players.lobby_id = '%d'" % [lobby_id] )
+			db.query("SELECT AVG(results.correct) AS 'average' FROM players INNER JOIN results ON players.player_id = results.player_id WHERE players.lobby_id = '%d'" % [lobby_id] )
 			print("AVE SCORE")
 			print(db.query_result)
+			print("")
+			analytics.append(db.query_result)
+			print("ANALYTICS")
+			print(analytics)
 			print("")
 			
 			#Most Difficult Questions
@@ -224,11 +231,19 @@ func _client_receive(id):
 			print("DIFF QUESTIONS")
 			print(db.query_result)
 			print("")
+			analytics.append(db.query_result)
+			print("ANALYTICS")
+			print(analytics)
+			print("")
 			
 			#Students that need further assistance
 			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
 			print("NEED HELP")
 			print(db.query_result)
+			print("")
+			analytics.append(db.query_result)
+			print("ANALYTICS")
+			print(analytics)
 			print("")
 			
 			#Easiest Questions
@@ -236,11 +251,19 @@ func _client_receive(id):
 			print("EASY QUESTIONS")
 			print(db.query_result)
 			print("")
+			analytics.append(db.query_result)
+			print("ANALYTICS")
+			print(analytics)
+			print("")
 			
 			#Top Students
 			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
 			print("TOP STUDENTS")
 			print(db.query_result)
+			print("")
+			analytics.append(db.query_result)
+			print("ANALYTICS")
+			print(analytics)
 			print("")
 			
 			#Get player_ids
@@ -256,25 +279,31 @@ func _client_receive(id):
 			print(db.query_result)
 			print("")
 			var question_ids = db.query_result.duplicate(true)
+
 			
 			#Get Person
 			print("PLAYER")
+			var player_result = []
 			for i in player_ids:
 				db.query("SELECT players.player_id, players.player_name, questions.question, questions.answer, results.correct FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON questions.question_id = results.question_id WHERE players.player_id = '%d'" % [i["player_id"]])
 				print(db.query_result)
 				print("")
+				player_result.append(db.query_result.duplicate(true))
+			analytics.append(player_result.duplicate(true))
+			
+			var question_result = []
 			#Get Question
 			for i in question_ids:
 				db.query("SELECT * FROM players INNER JOIN results ON players.player_id = results.player_id WHERE results.question_id = '%d'" % [i["question_id"]])
 				print(db.query_result)
 				print("")
-			
+				question_result.append(db.query_result.duplicate(true))
+			analytics.append(question_result.duplicate(true))
+
+			send_data(["EV", analytics],id)
 		else:
 			pass
 
-		send_data(["EV"],id)
-		pass
-	
 func send_data(data_send, id):
 	_server.get_peer(id).put_packet(Utils.encode_data(data_send))
 
