@@ -212,59 +212,41 @@ func _client_receive(id):
 			print(db.query_result)
 			print("")
 			analytics.append(db.query_result.duplicate(true))
-			print("ANALYTICS")
-			print(analytics)
-			print("")
 			
 			#Ave. Score
 			db.query("SELECT AVG(results.correct) AS 'average' FROM players INNER JOIN results ON players.player_id = results.player_id WHERE players.lobby_id = '%d'" % [lobby_id] )
 			print("AVE SCORE")
 			print(db.query_result)
 			print("")
-			analytics.append(db.query_result)
-			print("ANALYTICS")
-			print(analytics)
-			print("")
+			analytics.append(db.query_result.duplicate(true))
 			
 			#Most Difficult Questions
 			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
 			print("DIFF QUESTIONS")
 			print(db.query_result)
 			print("")
-			analytics.append(db.query_result)
-			print("ANALYTICS")
-			print(analytics)
-			print("")
+			analytics.append(db.query_result.duplicate(true))
 			
 			#Students that need further assistance
-			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
+			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) AS correct_ans FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
 			print("NEED HELP")
 			print(db.query_result)
 			print("")
-			analytics.append(db.query_result)
-			print("ANALYTICS")
-			print(analytics)
-			print("")
+			analytics.append(db.query_result.duplicate(true))
 			
 			#Easiest Questions
 			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
 			print("EASY QUESTIONS")
 			print(db.query_result)
 			print("")
-			analytics.append(db.query_result)
-			print("ANALYTICS")
-			print(analytics)
-			print("")
+			analytics.append(db.query_result.duplicate(true))
 			
 			#Top Students
-			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
+			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) AS correct_ans FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
 			print("TOP STUDENTS")
 			print(db.query_result)
 			print("")
-			analytics.append(db.query_result)
-			print("ANALYTICS")
-			print(analytics)
-			print("")
+			analytics.append(db.query_result.duplicate(true))
 			
 			#Get player_ids
 			db.query("SELECT * FROM players WHERE lobby_id = '%d'" % [lobby_id])
@@ -294,13 +276,18 @@ func _client_receive(id):
 			var question_result = []
 			#Get Question
 			for i in question_ids:
-				db.query("SELECT * FROM players INNER JOIN results ON players.player_id = results.player_id WHERE results.question_id = '%d'" % [i["question_id"]])
+				db.query("SELECT questions.question, players.player_name, results.correct, questions.answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d'" % [i["question_id"]])
 				print(db.query_result)
 				print("")
 				question_result.append(db.query_result.duplicate(true))
 			analytics.append(question_result.duplicate(true))
+			
+			db.query("SELECT * FROM lobbies WHERE lobby_id = '%d'" % [lobby_id])
+			print(db.query_result)
+			var lobby_page = str(db.query_result[0]["lobby_id"]) + db.query_result[0]["lobby_name"]
+			var evaluation_page = str(db.query_result[0]["lobby_id"]) + db.query_result[0]["result_page_name"]
 
-			send_data(["EV", analytics],id)
+			send_data(["EV", analytics, lobby_page, evaluation_page],id)
 		else:
 			pass
 
