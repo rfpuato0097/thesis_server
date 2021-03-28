@@ -29,6 +29,7 @@ func _init():
 	db.create_table("players", {
 		"player_id": {"data_type":"int", "primary_key":true, "not_null":true},
 		"player_name": {"data_type":"text", "not_null":true},
+		"player_game_score": {"data_type":"real"},
 		"player_client_id" : {"data_type":"text", "not_null":true},
 		"lobby_id": {"data_type":"int", "foreign_key":"lobbies.lobby_id", "not_null":true}
 	})
@@ -50,7 +51,8 @@ func _init():
 		"result_id": {"data_type":"int", "primary_key":true, "not_null":true},
 		"player_id": {"data_type":"int", "foreign_key":"players.player_id", "not_null":true},
 		"question_id": {"data_type":"int", "foreign_key":"questions.question_id", "not_null":true},
-		"correct": {"data_type":"int", "not_null":true}
+		"correct": {"data_type":"int", "not_null":true},
+		"player_answer": {"data_type":"text", "not_null":true}
 	})
 
 	#Network
@@ -158,6 +160,7 @@ func _client_receive(id):
 		var player_name = received[1]
 		var correct_questions = received[2]
 		var wrong_questions = received[3]
+		var player_game_score = received[4]
 		
 		#check player_client_id and player name.
 		var is_player_in_records = db.select_rows("players", "player_name = '%s' AND player_client_id = '%d'" % [player_name, id], ["player_id", "lobby_id"]).duplicate(true)
@@ -165,29 +168,37 @@ func _client_receive(id):
 			var lobby_id = is_player_in_records[0]["lobby_id"]
 			var player_id = is_player_in_records[0]["player_id"]
 			var questions_from_db = db.select_rows("questions", "lobby_id = '%d'" % [lobby_id], ["question_id", "question", "answer"]).duplicate(true)
-			print(str(questions_from_db))
+			#print(str(questions_from_db))
 			
 			for i in correct_questions:
 				for j in questions_from_db:
-					if i == j["question"]:
+					if i["question"] == j["question"]:
 						db.insert_rows("results", [
-							{"player_id":player_id, "question_id":j["question_id"], "correct":1}
+							{"player_id":player_id, "question_id":j["question_id"], "correct":1, "player_answer":i["player_answer"]}
 						])
 
 			for i in wrong_questions:
 				for j in questions_from_db:
-					if i == j["question"]:
+					if i["question"] == j["question"]:
 						db.insert_rows("results", [
-							{"player_id":player_id, "question_id":j["question_id"], "correct":0}
+							{"player_id":player_id, "question_id":j["question_id"], "correct":0, "player_answer": i["player_answer"]}
 						])
+			
+			db.query("UPDATE players SET player_game_score = '%f' WHERE player_id = '%d'" % [player_game_score, player_id])
 			var total = correct_questions.size() + wrong_questions.size()
-			var score = total - correct_questions.size()
-			send_data(["GR", score, total, correct_questions, wrong_questions, questions_from_db], id)
+			var score = correct_questions.size()
+			send_data(["GR", score, total, correct_questions, wrong_questions, questions_from_db, player_game_score], id)
 
 	if code == "EV": #Evaluation Page
 		#Do Learning Analytics here
 		var code_received = received[1]
 		var analytics = []
+		
+		#Clean players db
+		db.query("SELECT * FROM players WHERE player_id NOT IN (SELECT player_id FROM results)")
+		var to_delete = db.query_result.duplicate(true)
+		for i in to_delete:
+			db.delete_rows("players","player_id = '%d'" % [i["player_id"]])
 
 		#select lobby_id by using lobby_name
 		var regex = RegEx.new()
@@ -267,7 +278,7 @@ func _client_receive(id):
 			print("PLAYER")
 			var player_result = []
 			for i in player_ids:
-				db.query("SELECT players.player_id, players.player_name, questions.question, questions.answer, results.correct FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON questions.question_id = results.question_id WHERE players.player_id = '%d'" % [i["player_id"]])
+				db.query("SELECT players.player_id, players.player_name, questions.question, questions.answer, results.correct, results.player_answer, players.player_game_score FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON questions.question_id = results.question_id WHERE players.player_id = '%d'" % [i["player_id"]])
 				print(db.query_result)
 				print("")
 				player_result.append(db.query_result.duplicate(true))
@@ -276,7 +287,8 @@ func _client_receive(id):
 			var question_result = []
 			#Get Question
 			for i in question_ids:
-				db.query("SELECT questions.question, players.player_name, results.correct, questions.answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d'" % [i["question_id"]])
+				db.query("SELECT questions.question, players.player_name, results.correct, questions.answer, results.player_answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d'" % [i["question_id"]])
+				#db.query("SELECT * FROM (SELECT questions.question, players.player_name, results.correct, questions.answer, results.player_answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d') AS a CROSS JOIN (SELECT player_answer, COUNT(player_answer) AS freq FROM results WHERE question_id = '%d' GROUP BY player_answer) as b WHERE a.player_answer = b.player_answer" % [i["question_id"], i["question_id"]])
 				print(db.query_result)
 				print("")
 				question_result.append(db.query_result.duplicate(true))
@@ -289,7 +301,7 @@ func _client_receive(id):
 
 			send_data(["EV", analytics, lobby_page, evaluation_page],id)
 		else:
-			pass
+			send_data(["ER", "Lobby does not exist."], id)
 
 func send_data(data_send, id):
 	_server.get_peer(id).put_packet(Utils.encode_data(data_send))
