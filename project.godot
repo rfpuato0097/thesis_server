@@ -22,7 +22,7 @@ _global_script_class_icons={
 
 config/name="Mindgames_Server"
 run/main_scene="res://Server.tscn"
-config/icon="res://icon.png"
+config/icon="res://mg_icon2.png"
 
 [autoload]
 

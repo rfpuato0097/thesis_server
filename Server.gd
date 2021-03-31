@@ -1,6 +1,6 @@
 extends Node
 
-var PORT = 9080
+var PORT = 11100
 
 var _server = WebSocketServer.new()
 var _write_mode = WebSocketPeer.WRITE_MODE_BINARY
@@ -15,7 +15,7 @@ var data
 func _init():
 	#Database
 	db = SQLite.new()
-	db.path = "res://game_db"
+	db.path = "user://game_db"
 	db.verbose_mode = false
 	db.foreign_keys = true
 	db.open_db()
@@ -74,7 +74,7 @@ func _client_disconnected(id, clean = true):
 		_clients.erase(id)
 		
 func _client_close_request(id, code, reason):
-	print(reason == "Bye bye!")
+	#print(reason == "Bye bye!")
 	Utils._log("Client %s close code: %d, reason: %s" % [id ,code, reason])
 	
 func _client_receive(id):
@@ -82,7 +82,7 @@ func _client_receive(id):
 	var is_string = _server.get_peer(id).was_string_packet()
 	#PARSE DATA RECEIVED HERE
 	var received = Utils.decode_data(packet)
-	print(received)
+	#print(received)
 	
 	var code = received[0]
 	if code == "CG": #Create Game
@@ -98,7 +98,7 @@ func _client_receive(id):
 		#Insert questions into the database
 		var lobby = db.select_rows("lobbies", "lobby_name = '%s' AND result_page_name = '%s'" % [lobby_name, result_page_name], ["*"]).duplicate(true)
 		var lobby_id = lobby[0]["lobby_id"]
-		print(questions_received)
+		#print(questions_received)
 		for q in questions_received:
 			db.insert_rows("questions", [
 				{"question":q[0], "answer":q[1], "lobby_id":lobby_id}
@@ -127,7 +127,7 @@ func _client_receive(id):
 		var result = regex.search(code_received).get_string()
 		var lobby_id = int(result)
 		var lobby_name = code_received.replace(result, "")
-		print ("lobby_id: %d lobby_name: %s" % [lobby_id, lobby_name])
+		#print ("lobby_id: %d lobby_name: %s" % [lobby_id, lobby_name])
 		
 		#check if lobby exists
 		db.query_result = []
@@ -136,10 +136,10 @@ func _client_receive(id):
 		if db.query_result != []:
 			if db.query_result[0]["lobby_id"] == lobby_id and db.query_result[0]["lobby_name"] == lobby_name:
 				lobby_exists = true
-		print(db.query_result)
+		#print(db.query_result)
 		if lobby_exists:
 			#Insert player into database.
-			print("Add player")
+			#print("Add player")
 			db.insert_rows("players", [
 				{"player_name":player_name, "player_client_id":id, "lobby_id":lobby_id}
 			])
@@ -150,13 +150,13 @@ func _client_receive(id):
 			
 		else:
 			#Send Error to Client that Lobby does not exist.
-			print("No such lobby")
+			#print("No such lobby")
 			data = ["ER", "Lobby does not exist."]
 			send_data(data,id)
 			return
 		
 	if code == "GR": #Game Results
-		print(received) # 
+		#print(received) # 
 		var player_name = received[1]
 		var correct_questions = received[2]
 		var wrong_questions = received[3]
@@ -206,7 +206,7 @@ func _client_receive(id):
 		var result = regex.search(code_received).get_string()
 		var lobby_id = int(result)
 		var lobby_name = code_received.replace(result, "")
-		print ("lobby_id: %d lobby_name: %s" % [lobby_id, lobby_name])
+		#print ("lobby_id: %d lobby_name: %s" % [lobby_id, lobby_name])
 		
 		#check if lobby exists
 		db.query_result = []
@@ -215,72 +215,72 @@ func _client_receive(id):
 		if db.query_result != []:
 			if db.query_result[0]["lobby_id"] == lobby_id and db.query_result[0]["result_page_name"] == lobby_name:
 				lobby_exists = true
-		print(db.query_result)
+		#print(db.query_result)
 		if lobby_exists:
 			#No. of Players
 			db.query("SELECT COUNT(player_id) AS 'player_count' FROM players WHERE lobby_id = '%d'" % [lobby_id] )
-			print("No of Players")
-			print(db.query_result)
-			print("")
+			#print("No of Players")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Ave. Score
 			db.query("SELECT AVG(results.correct) AS 'average' FROM players INNER JOIN results ON players.player_id = results.player_id WHERE players.lobby_id = '%d'" % [lobby_id] )
-			print("AVE SCORE")
-			print(db.query_result)
-			print("")
+			#print("AVE SCORE")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Most Difficult Questions
 			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
-			print("DIFF QUESTIONS")
-			print(db.query_result)
-			print("")
+			#print("DIFF QUESTIONS")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Students that need further assistance
 			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) AS correct_ans FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) ASC" % [lobby_id])
-			print("NEED HELP")
-			print(db.query_result)
-			print("")
+			#print("NEED HELP")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Easiest Questions
 			db.query("SELECT results.question_id, questions.question, SUM(results.correct) AS 'no_of_correct' FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE players.lobby_id = '%d' GROUP BY results.question_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
-			print("EASY QUESTIONS")
-			print(db.query_result)
-			print("")
+			#print("EASY QUESTIONS")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Top Students
 			db.query("SELECT players.player_id, players.player_name, SUM(results.correct) AS correct_ans FROM players INNER JOIN results ON players.player_id = results.player_id WHERE lobby_id = '%d' GROUP BY results.player_id ORDER BY SUM(results.correct) DESC" % [lobby_id])
-			print("TOP STUDENTS")
-			print(db.query_result)
-			print("")
+			#print("TOP STUDENTS")
+			#print(db.query_result)
+			#print("")
 			analytics.append(db.query_result.duplicate(true))
 			
 			#Get player_ids
 			db.query("SELECT * FROM players WHERE lobby_id = '%d'" % [lobby_id])
-			print("PLAYER IDS")
-			print(db.query_result)
-			print("")
+			#print("PLAYER IDS")
+			#print(db.query_result)
+			#print("")
 			var player_ids = db.query_result.duplicate(true)
 			
 			#Get question_ids
 			db.query("SELECT * FROM questions WHERE lobby_id = '%d'" % [lobby_id])
-			print("QUESTION IDS")
-			print(db.query_result)
-			print("")
+			#print("QUESTION IDS")
+			#print(db.query_result)
+			#print("")
 			var question_ids = db.query_result.duplicate(true)
 
 			
 			#Get Person
-			print("PLAYER")
+			#print("PLAYER")
 			var player_result = []
 			for i in player_ids:
 				db.query("SELECT players.player_id, players.player_name, questions.question, questions.answer, results.correct, results.player_answer, players.player_game_score FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON questions.question_id = results.question_id WHERE players.player_id = '%d'" % [i["player_id"]])
-				print(db.query_result)
-				print("")
+				#print(db.query_result)
+				#print("")
 				player_result.append(db.query_result.duplicate(true))
 			analytics.append(player_result.duplicate(true))
 			
@@ -289,13 +289,13 @@ func _client_receive(id):
 			for i in question_ids:
 				db.query("SELECT questions.question, players.player_name, results.correct, questions.answer, results.player_answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d'" % [i["question_id"]])
 				#db.query("SELECT * FROM (SELECT questions.question, players.player_name, results.correct, questions.answer, results.player_answer FROM players INNER JOIN results ON players.player_id = results.player_id INNER JOIN questions ON results.question_id = questions.question_id WHERE results.question_id = '%d') AS a CROSS JOIN (SELECT player_answer, COUNT(player_answer) AS freq FROM results WHERE question_id = '%d' GROUP BY player_answer) as b WHERE a.player_answer = b.player_answer" % [i["question_id"], i["question_id"]])
-				print(db.query_result)
-				print("")
+				#print(db.query_result)
+				#print("")
 				question_result.append(db.query_result.duplicate(true))
 			analytics.append(question_result.duplicate(true))
 			
 			db.query("SELECT * FROM lobbies WHERE lobby_id = '%d'" % [lobby_id])
-			print(db.query_result)
+			#print(db.query_result)
 			var lobby_page = str(db.query_result[0]["lobby_id"]) + db.query_result[0]["lobby_name"]
 			var evaluation_page = str(db.query_result[0]["lobby_id"]) + db.query_result[0]["result_page_name"]
 
